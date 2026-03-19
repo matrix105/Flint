@@ -22,10 +22,14 @@
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Flint uses Face ID to protect your health and nutrition data.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Flint reads your health data to personalise your nutrition plan based on your activity, sleep, and vitals. All processing happens on your device.</string>
+	<string>Flint reads your activity, workouts, heart rate, sleep, and body measurements from Apple Health to personalise your nutrition plan and track your progress.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Flint writes your meal nutrition data (calories, protein, carbs, fat) and weight updates to Apple Health.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Flint uses your camera to scan meals and estimate nutrition from photos using on-device AI.</string>
+	<string>Flint uses the camera to identify food from photos using on-device AI.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -39,5 +43,9 @@
 	</array>
 	<key>UIUserInterfaceStyle</key>
 	<string>Dark</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>

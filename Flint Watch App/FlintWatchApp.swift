@@ -1,10 +1,16 @@
 import SwiftUI
+import WatchConnectivity
 
 @main
 struct FlintWatchApp: App {
+    @StateObject private var connectivityManager = WatchConnectivityManager.shared
+
     var body: some Scene {
         WindowGroup {
-            WatchDashboardView()
+            NavigationStack {
+                WatchDashboardView()
+                    .environmentObject(connectivityManager)
+            }
         }
     }
 }

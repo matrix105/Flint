@@ -6,7 +6,6 @@ struct ContentView: View {
     enum Tab: String, CaseIterable {
         case today = "Today"
         case log = "Log"
-        case plan = "Flint Plan"
         case progress = "Progress"
         case profile = "Profile"
     }
@@ -24,12 +23,6 @@ struct ContentView: View {
                     Label("Log", systemImage: "plus.circle.fill")
                 }
                 .tag(Tab.log)
-
-            FlintPlanView()
-                .tabItem {
-                    Label("Plan", systemImage: "calendar")
-                }
-                .tag(Tab.plan)
 
             ProgressView()
                 .tabItem {
@@ -49,4 +42,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(NutritionStore())
+        .environmentObject(HealthManager())
+        .environmentObject(GamificationEngine())
 }
