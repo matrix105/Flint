@@ -3,9 +3,12 @@ import SwiftUI
 struct FlintPlanView: View {
     @EnvironmentObject var nutritionStore: NutritionStore
     @EnvironmentObject var healthManager: HealthManager
+    @EnvironmentObject var gamificationEngine: GamificationEngine
     @StateObject private var planEngine = FlintPlanEngine()
     @State private var showVariations = false
     @State private var selectedMealForVariation: FlintPlanEngine.PlannedMeal?
+    @State private var showLogSuccess = false
+    @State private var loggedMealName = ""
 
     var body: some View {
         ScrollView {
@@ -82,10 +85,24 @@ struct FlintPlanView: View {
 
                     // Meal cards
                     ForEach(plan.meals) { meal in
-                        PlanMealCard(meal: meal) {
+                        PlanMealCard(meal: meal, onVariations: {
                             selectedMealForVariation = meal
                             showVariations = true
+                        }, onLog: {
+                            logPlannedMeal(meal)
+                        })
+                    }
+
+                    // Log success
+                    if showLogSuccess {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.flintSuccess)
+                            Text("\(loggedMealName) logged!")
+                                .font(.flintBody(14, weight: .medium))
+                                .foregroundColor(.flintSuccess)
                         }
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
             }
@@ -101,6 +118,39 @@ struct FlintPlanView: View {
                     targetMacros: meal.macros
                 )
             }
+        }
+    }
+
+    // MARK: - Log Planned Meal
+
+    private func logPlannedMeal(_ meal: FlintPlanEngine.PlannedMeal) {
+        let foodItems = meal.items.map { itemName in
+            // Distribute macros evenly across items
+            let count = Double(max(1, meal.items.count))
+            return FoodItemData(
+                name: itemName,
+                calories: meal.macros.calories / count,
+                protein: meal.macros.protein / count,
+                carbs: meal.macros.carbs / count,
+                fat: meal.macros.fat / count
+            )
+        }
+
+        nutritionStore.logMeal(name: meal.name, items: foodItems)
+
+        gamificationEngine.checkAndUnlockBadge(id: "first_plan")
+        gamificationEngine.evaluateAfterMealLog(
+            todayMacros: nutritionStore.todayMacros,
+            target: nutritionStore.target,
+            mealCount: nutritionStore.todayMeals.count,
+            streak: nutritionStore.streak
+        )
+        gamificationEngine.updateChallengeProgress()
+
+        loggedMealName = meal.name
+        withAnimation { showLogSuccess = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { showLogSuccess = false }
         }
     }
 }
@@ -157,6 +207,7 @@ struct MacroStat: View {
 struct PlanMealCard: View {
     let meal: FlintPlanEngine.PlannedMeal
     let onVariations: () -> Void
+    let onLog: () -> Void
 
     private var mealEmoji: String {
         switch meal.mealType {
@@ -206,9 +257,7 @@ struct PlanMealCard: View {
 
             // Actions
             HStack(spacing: 10) {
-                Button {
-                    // Log this meal
-                } label: {
+                Button(action: onLog) {
                     Text("Log This")
                         .font(.flintBody(13, weight: .semibold))
                         .frame(maxWidth: .infinity)

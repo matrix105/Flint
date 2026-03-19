@@ -2,9 +2,11 @@ import SwiftUI
 
 struct LogFoodView: View {
     @EnvironmentObject var nutritionStore: NutritionStore
+    @EnvironmentObject var gamificationEngine: GamificationEngine
     @StateObject private var scanEngine = FlintScanEngine()
     @State private var mealDescription: String = ""
     @State private var selectedMealType: String = "Lunch"
+    @State private var showLogSuccess = false
 
     private let mealTypes = ["Breakfast", "Lunch", "Dinner", "Snack"]
 
@@ -54,7 +56,8 @@ struct LogFoodView: View {
 
                     // Photo scan option
                     Button {
-                        // Camera capture flow
+                        // Camera capture — requires AVCaptureSession + Vision framework
+                        // For now, use text input as primary scan method
                     } label: {
                         HStack {
                             Image(systemName: "camera.fill")
@@ -74,7 +77,21 @@ struct LogFoodView: View {
 
                     // Scan results
                     if let result = scanEngine.lastResult {
-                        FlintScanResultView(result: result)
+                        FlintScanResultView(result: result) {
+                            logScanResult(result)
+                        }
+                    }
+
+                    // Success confirmation
+                    if showLogSuccess {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.flintSuccess)
+                            Text("Meal logged!")
+                                .font(.flintBody(14, weight: .medium))
+                                .foregroundColor(.flintSuccess)
+                        }
+                        .transition(.scale.combined(with: .opacity))
                     }
 
                     Spacer()
@@ -84,6 +101,63 @@ struct LogFoodView: View {
             .background(Color.flintBlack)
             .navigationTitle("Log")
             .navigationBarTitleDisplayMode(.large)
+            .onReceive(NotificationCenter.default.publisher(for: .watchQuickLogReceived)) { notification in
+                if let description = notification.userInfo?["description"] as? String {
+                    handleWatchQuickLog(description)
+                }
+            }
+        }
+    }
+
+    // MARK: - Log Scan Result
+
+    private func logScanResult(_ result: FlintScanResult) {
+        let foodItems = result.items.map { item in
+            FoodItemData(
+                name: item.name,
+                calories: item.estimatedMacros.calories,
+                protein: item.estimatedMacros.protein,
+                carbs: item.estimatedMacros.carbs,
+                fat: item.estimatedMacros.fat,
+                servingSize: item.servingSize
+            )
+        }
+
+        nutritionStore.logMeal(name: selectedMealType, items: foodItems)
+
+        // Gamification
+        gamificationEngine.evaluateAfterMealLog(
+            todayMacros: nutritionStore.todayMacros,
+            target: nutritionStore.target,
+            mealCount: nutritionStore.todayMeals.count,
+            streak: nutritionStore.streak
+        )
+        gamificationEngine.updateChallengeProgress()
+
+        // Check time-based badges
+        let hour = Calendar.current.component(.hour, from: .now)
+        if hour < 7 { gamificationEngine.checkAndUnlockBadge(id: "early_bird") }
+        if hour >= 0 && hour < 5 { gamificationEngine.checkAndUnlockBadge(id: "night_owl") }
+
+        // First scan badge
+        gamificationEngine.checkAndUnlockBadge(id: "first_scan")
+
+        withAnimation { showLogSuccess = true }
+        mealDescription = ""
+        scanEngine.lastResult = nil
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { showLogSuccess = false }
+        }
+    }
+
+    // MARK: - Watch Quick Log
+
+    private func handleWatchQuickLog(_ description: String) {
+        mealDescription = description
+        Task {
+            let result = await scanEngine.analyzeMealDescription(description)
+            logScanResult(result)
         }
     }
 }
@@ -117,6 +191,7 @@ struct MealTypeSelector: View {
 
 struct FlintScanResultView: View {
     let result: FlintScanResult
+    let onLog: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -126,19 +201,78 @@ struct FlintScanResultView: View {
                 Text("Flint Scan Results")
                     .font(.flintBody(15, weight: .semibold))
                     .foregroundColor(.flintText)
+                Spacer()
+                Text("\(Int(result.confidence * 100))% confidence")
+                    .font(.flintMono(11))
+                    .foregroundColor(.flintStone)
             }
 
             ForEach(result.items) { item in
                 HStack {
-                    Text(item.name)
-                        .font(.flintBody(14))
-                        .foregroundColor(.flintText)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(item.name)
+                            .font(.flintBody(14, weight: .medium))
+                            .foregroundColor(.flintText)
+                        Text(item.servingSize)
+                            .font(.flintBody(11))
+                            .foregroundColor(.flintStone)
+                    }
                     Spacer()
-                    Text("\(Int(item.estimatedMacros.calories)) kcal")
-                        .font(.flintMono(13))
-                        .foregroundColor(.flintGrey)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(Int(item.estimatedMacros.calories)) kcal")
+                            .font(.flintMono(13))
+                            .foregroundColor(.flintSpark)
+                        HStack(spacing: 6) {
+                            Text("P:\(Int(item.estimatedMacros.protein))")
+                                .foregroundColor(.flintProtein)
+                            Text("C:\(Int(item.estimatedMacros.carbs))")
+                                .foregroundColor(.flintCarbs)
+                            Text("F:\(Int(item.estimatedMacros.fat))")
+                                .foregroundColor(.flintFat)
+                        }
+                        .font(.flintMono(10))
+                    }
                 }
                 .padding(.vertical, 4)
+            }
+
+            // Totals
+            let totalMacros = result.items.reduce(into: MacroNutrients.zero) { r, item in
+                r = r + item.estimatedMacros
+            }
+            Divider().background(Color.flintDivider)
+            HStack {
+                Text("Total")
+                    .font(.flintBody(14, weight: .semibold))
+                    .foregroundColor(.flintText)
+                Spacer()
+                Text("\(Int(totalMacros.calories)) kcal")
+                    .font(.flintMono(14))
+                    .foregroundColor(.flintSpark)
+                Text("P:\(Int(totalMacros.protein)) C:\(Int(totalMacros.carbs)) F:\(Int(totalMacros.fat))")
+                    .font(.flintMono(11))
+                    .foregroundColor(.flintGrey)
+            }
+
+            // Note
+            if !result.note.isEmpty {
+                Text(result.note)
+                    .font(.flintBody(12))
+                    .foregroundColor(.flintGrey)
+                    .padding(8)
+                    .background(Color.flintMuted)
+                    .cornerRadius(8)
+            }
+
+            // Log button
+            Button(action: onLog) {
+                Text("Log This Meal")
+                    .font(.flintBody(15, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.flintSpark)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
             }
         }
         .padding()
@@ -150,4 +284,5 @@ struct FlintScanResultView: View {
 #Preview {
     LogFoodView()
         .environmentObject(NutritionStore())
+        .environmentObject(GamificationEngine())
 }

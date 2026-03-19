@@ -3,8 +3,11 @@ import SwiftUI
 struct VariationsView: View {
     let mealName: String
     let targetMacros: MacroNutrients
+    @EnvironmentObject var nutritionStore: NutritionStore
+    @EnvironmentObject var gamificationEngine: GamificationEngine
     @StateObject private var planEngine = FlintPlanEngine()
     @Environment(\.dismiss) private var dismiss
+    @State private var showLogSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -32,14 +35,16 @@ struct VariationsView: View {
                         VariationCard(
                             emoji: "💪",
                             label: "High Protein",
-                            meal: variations.count > 0 ? variations[0] : nil
+                            meal: variations.count > 0 ? variations[0] : nil,
+                            onLog: logVariation
                         )
 
                         if variations.count > 1 {
                             VariationCard(
                                 emoji: "🪶",
                                 label: "Lower Calorie",
-                                meal: variations[1]
+                                meal: variations[1],
+                                onLog: logVariation
                             )
                         }
 
@@ -47,8 +52,20 @@ struct VariationsView: View {
                             VariationCard(
                                 emoji: "⚡",
                                 label: "Quick Version",
-                                meal: variations[2]
+                                meal: variations[2],
+                                onLog: logVariation
                             )
+                        }
+
+                        if showLogSuccess {
+                            HStack {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.flintSuccess)
+                                Text("Meal logged!")
+                                    .font(.flintBody(14, weight: .medium))
+                                    .foregroundColor(.flintSuccess)
+                            }
+                            .transition(.scale.combined(with: .opacity))
                         }
                     }
                 }
@@ -73,12 +90,41 @@ struct VariationsView: View {
         else if hour < 18 { return "Dinner" }
         else { return "Snack" }
     }
+
+    private func logVariation(_ meal: FlintPlanEngine.PlannedMeal) {
+        let foodItems = meal.items.map { itemName in
+            let count = Double(max(1, meal.items.count))
+            return FoodItemData(
+                name: itemName,
+                calories: meal.macros.calories / count,
+                protein: meal.macros.protein / count,
+                carbs: meal.macros.carbs / count,
+                fat: meal.macros.fat / count
+            )
+        }
+
+        nutritionStore.logMeal(name: meal.name, items: foodItems)
+        gamificationEngine.evaluateAfterMealLog(
+            todayMacros: nutritionStore.todayMacros,
+            target: nutritionStore.target,
+            mealCount: nutritionStore.todayMeals.count,
+            streak: nutritionStore.streak
+        )
+        gamificationEngine.updateChallengeProgress()
+
+        withAnimation { showLogSuccess = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { showLogSuccess = false }
+            dismiss()
+        }
+    }
 }
 
 struct VariationCard: View {
     let emoji: String
     let label: String
     let meal: FlintPlanEngine.PlannedMeal?
+    let onLog: (FlintPlanEngine.PlannedMeal) -> Void
 
     var body: some View {
         if let meal {
@@ -106,7 +152,7 @@ struct VariationCard: View {
                 }
 
                 Button {
-                    // Log this variation
+                    onLog(meal)
                 } label: {
                     Text("Log This")
                         .font(.flintBody(14, weight: .semibold))

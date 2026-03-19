@@ -482,16 +482,53 @@ struct MealDataRow: View {
 // MARK: - Quick Actions
 
 struct QuickActionsRow: View {
+    @EnvironmentObject var nutritionStore: NutritionStore
+    @State private var showQuickLog = false
+    @State private var showWaterPicker = false
+    @State private var selectedTab: ContentView.Tab?
+
     var body: some View {
         HStack(spacing: 12) {
-            QuickActionButton(title: "Quick Log", icon: "bolt.fill", color: .flintSpark)
-            QuickActionButton(title: "Flint Scan", icon: "camera.fill", color: .flintProtein)
-            QuickActionButton(title: "Water", icon: "drop.fill", color: .flintSuccess)
+            // Quick Log → navigate to Log tab
+            Button {
+                showQuickLog = true
+            } label: {
+                QuickActionLabel(title: "Quick Log", icon: "bolt.fill", color: .flintSpark)
+            }
+            .fullScreenCover(isPresented: $showQuickLog) {
+                NavigationStack {
+                    LogFoodView()
+                        .environmentObject(nutritionStore)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("Close") { showQuickLog = false }
+                                    .foregroundColor(.flintSpark)
+                            }
+                        }
+                }
+            }
+
+            // Flint Scan → navigate to Log tab (same flow)
+            Button {
+                showQuickLog = true
+            } label: {
+                QuickActionLabel(title: "Flint Scan", icon: "camera.fill", color: .flintProtein)
+            }
+
+            // Water
+            Button {
+                showWaterPicker = true
+            } label: {
+                QuickActionLabel(title: "Water", icon: "drop.fill", color: .flintSuccess)
+            }
+            .sheet(isPresented: $showWaterPicker) {
+                WaterLogSheet()
+            }
         }
     }
 }
 
-struct QuickActionButton: View {
+struct QuickActionLabel: View {
     let title: String
     let icon: String
     let color: Color
@@ -509,6 +546,78 @@ struct QuickActionButton: View {
         .padding(.vertical, 12)
         .background(Color.flintSurface)
         .cornerRadius(12)
+    }
+}
+
+// MARK: - Water Log Sheet
+
+struct WaterLogSheet: View {
+    @EnvironmentObject var nutritionStore: NutritionStore
+    @EnvironmentObject var gamificationEngine: GamificationEngine
+    @Environment(\.dismiss) private var dismiss
+    @State private var amount: Double = 250
+
+    private let presets: [Double] = [150, 250, 330, 500, 750, 1000]
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.flintSuccess)
+
+                Text("\(Int(amount)) ml")
+                    .font(.flintDisplay(32))
+                    .foregroundColor(.flintText)
+
+                Text("Today: \(Int(nutritionStore.waterIntake)) ml")
+                    .font(.flintMono(14))
+                    .foregroundColor(.flintGrey)
+
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                    ForEach(presets, id: \.self) { preset in
+                        Button {
+                            amount = preset
+                        } label: {
+                            Text("\(Int(preset))ml")
+                                .font(.flintBody(14, weight: amount == preset ? .semibold : .regular))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(amount == preset ? Color.flintSpark : Color.flintSurface)
+                                .foregroundColor(amount == preset ? .white : .flintText)
+                                .cornerRadius(10)
+                        }
+                    }
+                }
+
+                Button {
+                    nutritionStore.addWater(amount)
+                    if nutritionStore.waterIntake >= 3000 {
+                        gamificationEngine.checkAndUnlockBadge(id: "water_champ")
+                    }
+                    dismiss()
+                } label: {
+                    Text("Log Water")
+                        .font(.flintBody(16, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.flintSuccess)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                }
+            }
+            .padding()
+            .background(Color.flintBlack)
+            .navigationTitle("Log Water")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                        .foregroundColor(.flintSpark)
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 
