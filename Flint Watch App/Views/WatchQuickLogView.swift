@@ -65,10 +65,6 @@ struct WatchQuickLogView: View {
         loggedMeal = description
         showConfirmation = true
 
-        #if os(watchOS)
-        WKInterfaceDevice.current().play(.success)
-        #endif
-
         // Auto-dismiss after 3 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             showConfirmation = false

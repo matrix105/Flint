@@ -483,9 +483,9 @@ struct MealDataRow: View {
 
 struct QuickActionsRow: View {
     @EnvironmentObject var nutritionStore: NutritionStore
+    @EnvironmentObject var gamificationEngine: GamificationEngine
     @State private var showQuickLog = false
     @State private var showWaterPicker = false
-    @State private var selectedTab: ContentView.Tab?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -499,6 +499,7 @@ struct QuickActionsRow: View {
                 NavigationStack {
                     LogFoodView()
                         .environmentObject(nutritionStore)
+                        .environmentObject(gamificationEngine)
                         .toolbar {
                             ToolbarItem(placement: .topBarLeading) {
                                 Button("Close") { showQuickLog = false }

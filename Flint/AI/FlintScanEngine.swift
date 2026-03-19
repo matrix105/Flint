@@ -26,7 +26,11 @@ struct ScannedFoodItem: Identifiable {
 
 class FlintScanEngine: ObservableObject {
     @Published var isProcessing: Bool = false
-    @Published var lastResult: FlintScanResult?
+    @Published private(set) var lastResult: FlintScanResult?
+
+    func clearResult() {
+        lastResult = nil
+    }
 
     // On-device food database for macro estimation
     private let foodDatabase: [String: (cal: Double, p: Double, c: Double, f: Double, serving: String)] = [

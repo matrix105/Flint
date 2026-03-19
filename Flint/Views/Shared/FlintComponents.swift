@@ -49,7 +49,7 @@ struct FlintButton: View {
 }
 
 struct FlintBadgeView: View {
-    let badge: FlintBadge
+    let badge: FlintBadgeData
 
     var body: some View {
         VStack(spacing: 6) {

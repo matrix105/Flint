@@ -144,7 +144,7 @@ struct LogFoodView: View {
 
         withAnimation { showLogSuccess = true }
         mealDescription = ""
-        scanEngine.lastResult = nil
+        scanEngine.clearResult()
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation { showLogSuccess = false }

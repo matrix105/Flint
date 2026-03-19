@@ -383,46 +383,7 @@ class NutritionStore: ObservableObject {
     }
 }
 
-// MARK: - Legacy value types (for non-persisted use)
-
-struct FoodItem: Identifiable, Codable {
-    let id: UUID
-    var name: String
-    var macros: MacroNutrients
-    var servingSize: String
-    var timestamp: Date
-
-    init(id: UUID = UUID(), name: String, macros: MacroNutrients, servingSize: String = "", timestamp: Date = .now) {
-        self.id = id
-        self.name = name
-        self.macros = macros
-        self.servingSize = servingSize
-        self.timestamp = timestamp
-    }
-}
-
-struct Meal: Identifiable, Codable {
-    let id: UUID
-    var name: String
-    var items: [FoodItem]
-    var timestamp: Date
-
-    init(id: UUID = UUID(), name: String, items: [FoodItem] = [], timestamp: Date = .now) {
-        self.id = id
-        self.name = name
-        self.items = items
-        self.timestamp = timestamp
-    }
-
-    var totalMacros: MacroNutrients {
-        items.reduce(into: MacroNutrients.zero) { result, item in
-            result.calories += item.macros.calories
-            result.protein += item.macros.protein
-            result.carbs += item.macros.carbs
-            result.fat += item.macros.fat
-        }
-    }
-}
+// MARK: - UserProfile (enums used by UserProfileData + OnboardingView)
 
 struct UserProfile: Codable {
     var name: String

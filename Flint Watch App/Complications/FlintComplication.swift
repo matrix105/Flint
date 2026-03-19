@@ -138,7 +138,6 @@ struct FlintComplicationInline: View {
 
 // MARK: - Widget Definition
 
-@main
 struct FlintComplicationWidget: Widget {
     let kind = "FlintComplication"
 
