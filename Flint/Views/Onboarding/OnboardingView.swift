@@ -12,6 +12,7 @@ struct OnboardingView: View {
     @State private var heightCm: String = "170"
     @State private var weightKg: String = "70"
     @State private var goalWeight: String = ""
+    @State private var sex: UserProfile.Sex = .male
     @State private var activityLevel: UserProfile.ActivityLevel = .moderatelyActive
     @State private var dietaryGoal: UserProfile.DietaryGoal = .maintain
 
@@ -110,6 +111,20 @@ struct OnboardingView: View {
     private var bodyStep: some View {
         VStack(alignment: .leading, spacing: 20) {
             OnboardingHeader(title: "Your Body", subtitle: "We'll use this to calculate your targets.")
+
+            // Sex selector
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Sex")
+                    .font(.flintBody(13, weight: .medium))
+                    .foregroundColor(.flintGrey)
+                HStack(spacing: 8) {
+                    ForEach(UserProfile.Sex.allCases, id: \.self) { s in
+                        OnboardingOptionRow(title: s.rawValue, subtitle: nil, isSelected: sex == s) {
+                            sex = s
+                        }
+                    }
+                }
+            }
 
             OnboardingTextField(label: "Height (cm)", text: $heightCm, placeholder: "170", keyboard: .decimalPad)
             OnboardingTextField(label: "Weight (kg)", text: $weightKg, placeholder: "70", keyboard: .decimalPad)
@@ -262,6 +277,7 @@ struct OnboardingView: View {
             heightCm: Double(heightCm) ?? 170,
             weightKg: Double(weightKg) ?? 70,
             goalWeight: Double(goalWeight),
+            sex: sex,
             activityLevel: activityLevel,
             dietaryGoal: dietaryGoal
         )
@@ -285,6 +301,7 @@ struct OnboardingView: View {
             heightCm: Double(heightCm) ?? 170,
             weightKg: Double(weightKg) ?? 70,
             goalWeight: Double(goalWeight),
+            sex: sex,
             activityLevel: activityLevel,
             dietaryGoal: dietaryGoal
         )

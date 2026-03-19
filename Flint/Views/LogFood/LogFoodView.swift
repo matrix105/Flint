@@ -142,6 +142,7 @@ struct LogFoodView: View {
         // First scan badge
         gamificationEngine.checkAndUnlockBadge(id: "first_scan")
 
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation { showLogSuccess = true }
         mealDescription = ""
         scanEngine.clearResult()

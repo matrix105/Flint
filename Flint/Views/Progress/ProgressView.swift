@@ -182,7 +182,7 @@ struct FlintXPCard: View {
             }
             .frame(height: 8)
 
-            Text("\(level * 500 - xp) XP to Level \(level + 1)")
+            Text("\(max(0, level * 500 - xp)) XP to Level \(level + 1)")
                 .font(.flintBody(11))
                 .foregroundColor(.flintStone)
         }

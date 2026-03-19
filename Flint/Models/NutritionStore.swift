@@ -90,22 +90,29 @@ final class UserProfileData {
     var heightCm: Double
     var weightKg: Double
     var goalWeight: Double?
+    var sexRaw: String
     var activityLevelRaw: String
     var dietaryGoalRaw: String
     var hasCompletedOnboarding: Bool
     var createdAt: Date
 
-    init(name: String = "", age: Int = 25, heightCm: Double = 170, weightKg: Double = 70, goalWeight: Double? = nil, activityLevel: UserProfile.ActivityLevel = .moderatelyActive, dietaryGoal: UserProfile.DietaryGoal = .maintain) {
+    init(name: String = "", age: Int = 25, heightCm: Double = 170, weightKg: Double = 70, goalWeight: Double? = nil, sex: UserProfile.Sex = .male, activityLevel: UserProfile.ActivityLevel = .moderatelyActive, dietaryGoal: UserProfile.DietaryGoal = .maintain) {
         self.id = UUID()
         self.name = name
         self.age = age
         self.heightCm = heightCm
         self.weightKg = weightKg
         self.goalWeight = goalWeight
+        self.sexRaw = sex.rawValue
         self.activityLevelRaw = activityLevel.rawValue
         self.dietaryGoalRaw = dietaryGoal.rawValue
         self.hasCompletedOnboarding = false
         self.createdAt = .now
+    }
+
+    var sex: UserProfile.Sex {
+        get { UserProfile.Sex(rawValue: sexRaw) ?? .male }
+        set { sexRaw = newValue.rawValue }
     }
 
     var activityLevel: UserProfile.ActivityLevel {
@@ -222,8 +229,12 @@ struct NutritionTarget: Codable, Equatable {
         let heightCm = profile.heightCm
         let age = Double(profile.age)
 
-        // Using male formula as default; extend with sex field
-        bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5
+        switch profile.sex {
+        case .male:
+            bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5
+        case .female:
+            bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161
+        }
 
         let activityMultiplier: Double
         switch profile.activityLevel {
@@ -333,6 +344,41 @@ class NutritionStore: ObservableObject {
         try? context.save()
         loadToday()
         updateStreak()
+        syncToWatch()
+    }
+
+    func deleteMeal(_ meal: MealData) {
+        guard let context = modelContext else { return }
+        context.delete(meal)
+        try? context.save()
+        loadToday()
+        syncToWatch()
+    }
+
+    func loadProfile() {
+        guard let context = modelContext else { return }
+        let descriptor = FetchDescriptor<UserProfileData>()
+        if let profile = (try? context.fetch(descriptor))?.first {
+            target = NutritionTarget.calculate(for: profile)
+        }
+    }
+
+    private func syncToWatch() {
+        let lastMeal = todayMeals.last.map { meal -> (name: String, time: String, calories: Int) in
+            (meal.name, meal.timestamp.formatted(date: .omitted, time: .shortened), Int(meal.totalMacros.calories))
+        }
+        WatchConnectivityManager.shared.syncTodayToWatch(
+            calories: todayMacros.calories,
+            target: target.calories,
+            protein: todayMacros.protein,
+            proteinTarget: target.protein,
+            carbs: todayMacros.carbs,
+            carbsTarget: target.carbs,
+            fat: todayMacros.fat,
+            fatTarget: target.fat,
+            streak: streak,
+            lastMeal: lastMeal
+        )
     }
 
     func addWater(_ amount: Double) {
@@ -393,6 +439,11 @@ struct UserProfile: Codable {
     var goalWeight: Double?
     var activityLevel: ActivityLevel
     var dietaryGoal: DietaryGoal
+
+    enum Sex: String, Codable, CaseIterable {
+        case male = "Male"
+        case female = "Female"
+    }
 
     enum ActivityLevel: String, Codable, CaseIterable {
         case sedentary = "Sedentary"

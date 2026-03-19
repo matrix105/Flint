@@ -52,6 +52,7 @@ struct FlintApp: App {
                 let context = sharedModelContainer.mainContext
                 nutritionStore.configure(with: context)
                 gamificationEngine.configure(with: context)
+                Task { await healthManager.fetchAllTodayData() }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 switch newPhase {

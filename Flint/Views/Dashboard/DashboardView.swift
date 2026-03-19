@@ -4,29 +4,39 @@ struct DashboardView: View {
     @EnvironmentObject var nutritionStore: NutritionStore
     @EnvironmentObject var healthManager: HealthManager
     @EnvironmentObject var gamificationEngine: GamificationEngine
+    @State private var showBadgeToast = false
+    @State private var unlockedBadgeName = ""
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    // Header
-                    DashboardHeader()
+            ZStack {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Header
+                        DashboardHeader()
 
-                    // Calorie ring
-                    CalorieRingView(
-                        consumed: nutritionStore.todayMacros.calories,
-                        target: nutritionStore.target.calories,
-                        burned: healthManager.activeCalories
-                    )
+                        // Calorie ring + deficit
+                        CalorieRingView(
+                            consumed: nutritionStore.todayMacros.calories,
+                            target: nutritionStore.target.calories,
+                            burned: healthManager.activeCalories
+                        )
 
-                    // Health Snapshot
-                    HealthSnapshotView()
+                        // Deficit/surplus indicator
+                        DeficitSurplusBar(
+                            consumed: nutritionStore.todayMacros.calories,
+                            target: nutritionStore.target.calories,
+                            burned: healthManager.activeCalories
+                        )
 
-                    // Macro bars
-                    MacroBarStack(
-                        macros: nutritionStore.todayMacros,
-                        target: nutritionStore.target
-                    )
+                        // Health Snapshot
+                        HealthSnapshotView()
+
+                        // Macro bars with percentages
+                        MacroBarStack(
+                            macros: nutritionStore.todayMacros,
+                            target: nutritionStore.target
+                        )
 
                     // Streak + Level
                     StreakLevelBar(
@@ -65,8 +75,11 @@ struct DashboardView: View {
                         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.flintBorder, lineWidth: 1))
                     }
 
-                    // Today's meals
-                    TodayMealsSection(meals: nutritionStore.todayMeals)
+                    // Today's meals (with delete)
+                    TodayMealsSection(meals: nutritionStore.todayMeals) { meal in
+                        nutritionStore.deleteMeal(meal)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    }
 
                     // Quick actions
                     QuickActionsRow()
@@ -76,7 +89,98 @@ struct DashboardView: View {
             .background(Color.flintBlack)
             .navigationTitle("Today")
             .navigationBarTitleDisplayMode(.large)
+
+                // Badge unlock toast
+                if showBadgeToast {
+                    VStack {
+                        Spacer()
+                        BadgeUnlockToast(badgeName: unlockedBadgeName)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .padding(.bottom, 100)
+                    }
+                    .animation(.spring(duration: 0.5), value: showBadgeToast)
+                }
+            } // ZStack
+            .onChange(of: gamificationEngine.recentUnlock?.id) { _, newValue in
+                if let badge = gamificationEngine.recentUnlock {
+                    unlockedBadgeName = badge.name
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    withAnimation { showBadgeToast = true }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation { showBadgeToast = false }
+                    }
+                }
+            }
         }
+    }
+}
+
+// MARK: - Badge Unlock Toast
+
+struct BadgeUnlockToast: View {
+    let badgeName: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "trophy.fill")
+                .foregroundColor(.flintGlow)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Badge Unlocked!")
+                    .font(.flintBody(12, weight: .semibold))
+                    .foregroundColor(.flintGlow)
+                Text(badgeName)
+                    .font(.flintBody(14, weight: .bold))
+                    .foregroundColor(.flintText)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(.ultraThinMaterial)
+        .background(Color.flintSpark.opacity(0.15))
+        .cornerRadius(16)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Deficit / Surplus Bar
+
+struct DeficitSurplusBar: View {
+    let consumed: Double
+    let target: Double
+    let burned: Double
+
+    private var net: Double {
+        consumed - burned * 0.5
+    }
+
+    private var deficit: Double {
+        target - net
+    }
+
+    var body: some View {
+        HStack {
+            if deficit > 0 {
+                Image(systemName: "arrow.down.circle.fill")
+                    .foregroundColor(.flintSuccess)
+                Text("\(Int(deficit)) kcal deficit")
+                    .font(.flintMono(13))
+                    .foregroundColor(.flintSuccess)
+            } else {
+                Image(systemName: "arrow.up.circle.fill")
+                    .foregroundColor(.flintDanger)
+                Text("\(Int(abs(deficit))) kcal surplus")
+                    .font(.flintMono(13))
+                    .foregroundColor(.flintDanger)
+            }
+            Spacer()
+            Text("Net: \(Int(net)) kcal")
+                .font(.flintMono(11))
+                .foregroundColor(.flintStone)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.flintSurface)
+        .cornerRadius(10)
     }
 }
 
@@ -350,8 +454,25 @@ struct MacroBarStack: View {
     let macros: MacroNutrients
     let target: NutritionTarget
 
+    private var totalCalories: Double {
+        max(1, macros.protein * 4 + macros.carbs * 4 + macros.fat * 9)
+    }
+
+    private func pct(_ macro: Double, calPerGram: Double) -> Int {
+        Int(round(macro * calPerGram / totalCalories * 100))
+    }
+
     var body: some View {
         VStack(spacing: 12) {
+            // Macro percentage summary
+            if macros.calories > 0 {
+                HStack(spacing: 0) {
+                    MacroPercentChip(label: "P", pct: pct(macros.protein, calPerGram: 4), color: .flintProtein)
+                    MacroPercentChip(label: "C", pct: pct(macros.carbs, calPerGram: 4), color: .flintCarbs)
+                    MacroPercentChip(label: "F", pct: pct(macros.fat, calPerGram: 9), color: .flintFat)
+                }
+            }
+
             MacroBar(label: "Protein", current: macros.protein, target: target.protein, unit: "g", color: .flintProtein)
             MacroBar(label: "Carbs", current: macros.carbs, target: target.carbs, unit: "g", color: .flintCarbs)
             MacroBar(label: "Fat", current: macros.fat, target: target.fat, unit: "g", color: .flintFat)
@@ -359,6 +480,24 @@ struct MacroBarStack: View {
         .padding()
         .background(Color.flintSurface)
         .cornerRadius(16)
+    }
+}
+
+struct MacroPercentChip: View {
+    let label: String
+    let pct: Int
+    let color: Color
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("\(pct)%")
+                .font(.flintMono(14))
+                .foregroundColor(color)
+            Text(label)
+                .font(.flintBody(10))
+                .foregroundColor(.flintStone)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -411,6 +550,7 @@ struct MacroBar: View {
 
 struct TodayMealsSection: View {
     let meals: [MealData]
+    var onDelete: ((MealData) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -435,6 +575,15 @@ struct TodayMealsSection: View {
             } else {
                 ForEach(meals) { meal in
                     MealDataRow(meal: meal)
+                        .swipeActions(edge: .trailing) {
+                            if let onDelete {
+                                Button(role: .destructive) {
+                                    onDelete(meal)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                            }
+                        }
                 }
             }
         }
@@ -524,6 +673,8 @@ struct QuickActionsRow: View {
             }
             .sheet(isPresented: $showWaterPicker) {
                 WaterLogSheet()
+                    .environmentObject(nutritionStore)
+                    .environmentObject(gamificationEngine)
             }
         }
     }

@@ -33,12 +33,20 @@ struct ProfileView: View {
 
                     // Settings links
                     VStack(spacing: 0) {
+                        NavigationLink(destination: EditProfileView()) {
+                            SettingsRow(icon: "person.crop.circle", label: "Edit Profile", color: .flintSpark)
+                        }
+                        Divider().background(Color.flintDivider)
                         NavigationLink(destination: SettingsView()) {
                             SettingsRow(icon: "gearshape.fill", label: "Settings", color: .flintGrey)
                         }
                         Divider().background(Color.flintDivider)
                         NavigationLink(destination: HealthSettingsView()) {
                             SettingsRow(icon: "heart.fill", label: "Apple Health", color: .flintSpark)
+                        }
+                        Divider().background(Color.flintDivider)
+                        NavigationLink(destination: MealHistoryView()) {
+                            SettingsRow(icon: "clock.arrow.circlepath", label: "Meal History", color: .flintProtein)
                         }
                         Divider().background(Color.flintDivider)
                         SettingsRow(icon: "lock.shield.fill", label: "Security", color: .flintFat)
@@ -82,7 +90,11 @@ struct LevelCard: View {
     }
 
     private var xpForNextLevel: Int {
-        (level) * 500
+        level * 500
+    }
+
+    private var xpToNextLevel: Int {
+        max(0, xpForNextLevel - xp)
     }
 
     private var levelProgress: Double {
@@ -124,7 +136,7 @@ struct LevelCard: View {
             }
             .frame(height: 8)
 
-            Text("\(xpForNextLevel - xp) XP to Level \(level + 1)")
+            Text("\(xpToNextLevel) XP to Level \(level + 1)")
                 .font(.flintBody(11))
                 .foregroundColor(.flintStone)
         }

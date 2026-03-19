@@ -54,6 +54,7 @@ struct LockScreenView: View {
 // MARK: - PIN Entry View
 
 struct PINEntryView: View {
+    @Environment(AuthenticationManager.self) var auth
     let onComplete: (String) -> Bool
     @State private var pin: String = ""
     @State private var shake = false
@@ -87,7 +88,7 @@ struct PINEntryView: View {
 
                 // Bottom row
                 PINButton(label: "face.smiling", isSymbol: true) {
-                    Task { _ = await AuthenticationManager().authenticateWithBiometrics() }
+                    Task { _ = await auth.authenticateWithBiometrics() }
                 }
                 PINButton(label: "0") {
                     appendDigit("0")
